@@ -1,37 +1,45 @@
-import json
-import os
+import pandas as pd
+from sklearn.ensemble import IsolationForest
 
-class Feedback:
+class AnomalyDetector:
+    def __init__(self, contamination=0.1):
+        self.model = IsolationForest(contamination=contamination)
+
+    def fit(self, data):
+        self.model.fit(data)
+
+    def predict(self, data):
+        return self.model.predict(data)
+
+class FeedbackSystem:
     def __init__(self):
-        self.feedback_file = 'feedback.json'
-        self.feedback_data = self.load_feedback()
+        self.detector = AnomalyDetector()
+        self.feedback_data = pd.DataFrame(columns=['data', 'label'])
 
-    def load_feedback(self):
-        if os.path.exists(self.feedback_file):
-            with open(self.feedback_file, 'r') as file:
-                return json.load(file)
-        else:
-            return {}
+    def collect_feedback(self, data, label):
+        self.feedback_data = self.feedback_data.append({'data': data, 'label': label}, ignore_index=True)
 
-    def save_feedback(self):
-        with open(self.feedback_file, 'w') as file:
-            json.dump(self.feedback_data, file, indent=4)
+    def refine_model(self):
+        true_positives = self.feedback_data[self.feedback_data['label'] == 1]
+        self.detector.fit(true_positives['data'])
 
-    def provide_feedback(self, anomaly_id, is_true_anomaly):
-        self.feedback_data[anomaly_id] = is_true_anomaly
-        self.save_feedback()
+    def detect_anomalies(self, data):
+        predictions = self.detector.predict(data)
+        return predictions
 
-    def get_feedback(self, anomaly_id):
-        return self.feedback_data.get(anomaly_id, None)
+# Usage
+feedback_system = FeedbackSystem()
 
-if __name__ == "__main__":
-    feedback = Feedback()
-    while True:
-        print("Please enter the anomaly ID (or 'exit' to quit):")
-        anomaly_id = input()
-        if anomaly_id.lower() == 'exit':
-            break
-        print("Is this a true anomaly? (yes/no):")
-        is_true_anomaly = input().lower() == 'yes'
-        feedback.provide_feedback(anomaly_id, is_true_anomaly)
-        print("Thank you for your feedback!")
+# Simulate time series data
+time_series_data = pd.DataFrame({'data': range(100)})
+
+# Detect anomalies
+anomalies = feedback_system.detect_anomalies(time_series_data)
+
+# Collect feedback
+for anomaly in anomalies:
+    # Here, we simulate user feedback. In a real-world scenario, you would collect this from the user.
+    feedback_system.collect_feedback(anomaly, label=1 if anomaly == True else -1)
+
+# Refine the model based on the feedback
+feedback_system.refine_model()
